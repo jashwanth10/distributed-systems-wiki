@@ -9,4 +9,4 @@ class MapResponse{
 };
 
 
-#endif MAP_RESPONSE_H
+#endif

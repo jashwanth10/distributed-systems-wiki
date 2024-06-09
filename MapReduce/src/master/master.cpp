@@ -5,25 +5,30 @@
 #include <string>
 #include <rpc/client.h>
 #include <rpc/server.h>
+#include <rpc/rpc_error.h> 
+#include <thread>
 #include "ReduceResponse.h"
 #include "MapResponse.h"
 
 namespace fs = std::filesystem;
 
-Master::Master() {}
-
-int Master::Initialize(std::vector<char*> workers)
+Master::Master() : server(std::make_unique<rpc::server>(8080))
 {
-    for(auto worker: workers)
+    Master::server->bind("hello", Master::hello_world);
+    Master::server->async_run();
+}
+
+int Master::Initialize(std::vector<std::string> workers)
+{
+    for(std::string worker: workers)
     {
-        rpc::client client("localhost", stoi((std::string)worker));
-        Master::workers.push_back(client);
-        Master::idle_workers.push(client);
+        auto client = std::make_unique<rpc::client>("localhost", stoi(worker));
+        Master::idle_workers.push(std::move(client));
     }
     return 0;
 }
 
-void Master::Run(std::vector<char *> files)
+void Master::Run(std::vector<std::string>files)
 {   
     // tmp diectory
     fs::path chunk_directory = "./.tmp/.chunks";
@@ -56,21 +61,23 @@ void Master::Run(std::vector<char *> files)
             inputFile.read(buffer.data(), buffer_size);
             bytes_read = inputFile.gcount();
             if(bytes_read == 0)
-            {
+            {   
                 break;
             }
 
             // write into chunk file
-            std::string chunk_file = "./tmp/.chunks/chunk_" + std::to_string(chunk_number);
+            std::string chunk_file = "./.tmp/.chunks/chunk_" + filename + "_" + std::to_string(chunk_number);
             std::ofstream outputFile(chunk_file);
-            if (!outputFile.is_open()) 
+            if (outputFile.is_open()) 
             {
+                outputFile.write(buffer.data(),  bytes_read);   
+                std::cout<<"Written into chunk: "<<chunk_file<<std::endl;
+            }
+            else{
                 std::cerr << "Failed to create chunk" << std::endl;
                 inputFile.close();
                 return;
             }
-
-            outputFile.write(buffer.data(),  bytes_read);
 
             if(!outputFile)
             {
@@ -79,12 +86,8 @@ void Master::Run(std::vector<char *> files)
                 outputFile.close();
                 return;
             }
-
             chunk_number++;
-
-
         }while(bytes_read == buffer_size);
-
     }
 
     Master::RunServer();
@@ -92,7 +95,16 @@ void Master::Run(std::vector<char *> files)
     // Assign Map tasks
     while(!Master::idle_workers.empty())
     {
-        int status = Master::idle_workers.front().call("assign_map_task").as<int>();
+        auto& worker = Master::idle_workers.front();
+        int status = -1;
+        try {
+            worker->call("assign_map_task", status);
+        }
+        catch(const rpc::system_error& e){
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            std::cerr<<"Worker is not up!"<<std::endl;
+        }
+
         // Master::intermediary_locations.push(map_response.chunk_location);
         if(status == 1){
             Master::idle_workers.pop();
@@ -104,25 +116,10 @@ void Master::Run(std::vector<char *> files)
 
 void Master::RunServer()
 {
-    rpc::server srv(8080);
-    srv.bind("write_intermediate_location", Master::WriteIntermediate);
-    srv.bind("request_reduce", Master::AssignReduce);
-    srv.async_run();
-    return;
+    
 }
 
-void Master::WriteIntermediate()
+void Master::hello_world()
 {
-    return;
-}
-
-MapResponse Master::assignMap()
-{   
-    return;
-}
-
-ReduceResponse Master::AssignReduce()
-{   
-
-    return;
+    std::cout<<"Hello"<<std::endl;
 }

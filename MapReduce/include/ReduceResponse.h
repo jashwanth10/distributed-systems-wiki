@@ -9,4 +9,4 @@ class ReduceResponse{
 };
 
 
-#endif REDUCE_RESPONSE_H
+#endif

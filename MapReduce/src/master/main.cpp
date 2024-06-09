@@ -7,26 +7,25 @@
 int main(int argc, char* argv[]){
 
 
-    std::vector<char*> files;
-    std::vector<char*> workers;
+    std::vector<std::string> files;
+    std::vector<std::string> workers;
 
     for(int i=0;i<argc;i++){
-        if(strcmp(argv[i], "--files") == 0){
+        if(i < argc && strcmp(argv[i], "--files") == 0){
             i++;
             while(i < argc && argv[i][0] != '-'){
-                files.push_back(argv[i]);
+                files.push_back((std::string)argv[i]);
                 i++;
             }
         }
-        if(strcmp(argv[i], "--workers") == 0){
+        if(i<argc && strcmp(argv[i], "--workers") == 0){
             i++;
             while(i < argc && argv[i][0] != '-'){
-                files.push_back(argv[i]);
+                workers.push_back(argv[i]);
                 i++;
             }
         }
     }
-
     // Master
     Master* master_node = new Master();
     if(master_node->Initialize(workers) != -1)

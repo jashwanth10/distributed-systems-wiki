@@ -11,13 +11,16 @@
 class Worker{
     public:
         Worker();
+        static void RunMap(std::string);
+        static void RunReduce();
+
         int Initialize(int port);
         void Poll();
     
     private:
         int master_port; 
-        void RunMap(std::string chunk_name);
-        void RunReduce();
+        void WordCountMap(std::vector<char> data);
+        void WriteIntermediary(std::map<std::string, int>);
 };
 
 #endif
