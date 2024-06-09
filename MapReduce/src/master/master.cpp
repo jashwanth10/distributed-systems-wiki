@@ -12,9 +12,9 @@
 
 namespace fs = std::filesystem;
 
-Master::Master() : server(std::make_unique<rpc::server>(8080))
+Master::Master() : server(std::make_unique<rpc::server>(8080)), total_chunks(0)
 {
-    Master::server->bind("hello", Master::hello_world);
+    Master::server->bind("assign_task", Master::assign_task);
     Master::server->async_run();
 }
 
@@ -23,7 +23,7 @@ int Master::Initialize(std::vector<std::string> workers)
     for(std::string worker: workers)
     {
         auto client = std::make_unique<rpc::client>("localhost", stoi(worker));
-        Master::idle_workers.push(std::move(client));
+        Master::idle_workers.push_back(std::move(client));
     }
     return 0;
 }
@@ -88,10 +88,9 @@ void Master::Run(std::vector<std::string>files)
             }
             chunk_number++;
         }while(bytes_read == buffer_size);
+        total_chunks += chunk_number+1;
     }
 
-    Master::RunServer();
-    
     // Assign Map tasks
     while(!Master::idle_workers.empty())
     {
@@ -106,20 +105,35 @@ void Master::Run(std::vector<std::string>files)
         }
 
         // Master::intermediary_locations.push(map_response.chunk_location);
-        if(status == 1){
-            Master::idle_workers.pop();
+    }
+}
+
+std::pair<int, std::string> Master::assign_task()
+{
+    if(phase == 0){
+        std::string path = "./.tmp/.chunks";
+        for (const auto& entry : fs::directory_iterator(path))
+        {
+            if(processed_chunks.find(entry.path().string()) != processed_chunks.end())
+            {
+                processed_chunks.insert(entry.path().string());
+                return std::make_pair(0, entry.path().string());
+            }
+        }
+        if(processed_chunks.size() == total_chunks){
+            phase = 1;
+        }
+
+    }else{
+        std::string path = "./.tmp/.intermediaries";
+        for (const auto& entry : fs::directory_iterator(path))
+        {
+            if(processed_intermediaries.find(entry.path().string()) != processed_intermediaries.end())
+            {
+                processed_intermediaries.insert(entry.path().string());
+                return std::make_pair(1, entry.path().string());
+            }
         }
     }
-
-
-}
-
-void Master::RunServer()
-{
-    
-}
-
-void Master::hello_world()
-{
-    std::cout<<"Hello"<<std::endl;
+    return std::make_pair(-1, "wait");
 }

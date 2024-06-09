@@ -3,17 +3,12 @@
 #include<iostream>
 
 int main(int argc, char* argv[]){
-    Worker* worker = new Worker();
-    int master_port = stoi((std::string)argv[1]);
-    rpc::client client("localhost", 8080);
-    client.call("hello");
+    int my_port = stoi((std::string)argv[1]);
+    Worker* worker = new Worker(my_port);
 
-
-
-    // if(worker->Initialize(master_port) == 0){
-    //   worker->Poll();
-      
-    // }
+    if(worker->Initialize(my_port) == 0){
+      worker->Poll(); 
+    }
 
     return 0;
 }
